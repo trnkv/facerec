@@ -12,19 +12,32 @@ if __name__ == '__main__':
     known_face_encodings, known_face_names = get_encodings(encodings_path)
 
     video_capture = cv2.VideoCapture(0)
+    video_capture.set(cv2.CAP_PROP_FRAME_WIDTH, 300)
+    video_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 300)
+    video_capture.set(cv2.CAP_PROP_FPS, 2)
 
     # "Прогреваем" камеру, чтобы снимок не был тёмным
-    for i in range(30):
-        video_capture.read()
+    # for i in range(30):
+    #     video_capture.read()
+
+    frame_number = 0
     
     while True:
         # Grab a single frame of video
         ret, frame = video_capture.read()
+        
+        frame_number += 1
+        if frame_number % 24 != 0:
+            cv2.imshow('Video', frame)
+            # Hit 'q' on the keyboard to quit!
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+            continue
         # ================= Resize frame of video to 1/10 size for faster face recognition processing ===========================
-        small_frame = cv2.resize(frame, (0, 0), fx=0.1, fy=0.1)
+        # frame = cv2.resize(frame, (0, 0), fx=0.3, fy=0.3)
 
         # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
-        rgb_frame = small_frame[:, :, ::-1]
+        rgb_frame = frame[:, :, ::-1]
 
         # Find all the faces and face enqcodings in the frame of video
         face_locations = face_recognition.face_locations(rgb_frame)
@@ -33,10 +46,10 @@ if __name__ == '__main__':
         # Loop through each face in this frame of video
         for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
             # Scale back up face locations since the frame we detected in was scaled to 1/10 size
-            top *= 10
-            right *= 10
-            bottom *= 10
-            left *= 10
+            # top *= 30
+            # right *= 30
+            # bottom *= 30
+            # left *= 30
 
             # Draw a box around the face
             cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
@@ -49,6 +62,7 @@ if __name__ == '__main__':
             if True in matches:
                 first_match_index = matches.index(True)
                 name = known_face_names[first_match_index]
+                print('DETECTED ', name)
 
             # Or instead, use the known face with the smallest distance to the new face
             # face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
