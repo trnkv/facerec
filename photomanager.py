@@ -5,13 +5,13 @@ import pickle
 
 def save_encodings(photo_path, encoding_path):
     for photo_file in listdir(photo_path):
-        if not os.path.isfile(encoding_path+photo_file[:-4]+".txt"):
+        if not os.path.isfile(encoding_path+photo_file[:-4]+".pckl"):
             name = photo_file
             image = face_recognition.load_image_file(photo_path + name)
             new_encoding = face_recognition.face_encodings(image)[0]
-            with open(encoding_path + name[:-4] + ".txt", "wb") as new_encoding_file:
+            with open(encoding_path + name[:-4] + ".pckl", "wb") as new_encoding_file:
                 pickle.dump(new_encoding, new_encoding_file)
-                print('Encoding %s have been saved!' % (encoding_path + name[:-4] + ".txt"))
+                print('Encoding %s have been saved!' % (encoding_path + name[:-4] + ".pckl"))
 
 
 def get_encodings(encoding_path):
