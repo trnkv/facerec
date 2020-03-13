@@ -3,20 +3,15 @@ import numpy as np
 import face_recognition
 import datetime
 import os.path
-path = '.'
 from photomanager import save_encodings, get_encodings
 
-if __name__ == '__main__':
+def app(video_capture):
     photos_path = "photos/"
     encodings_path = "encodings/"
+    flag = False
 
     save_encodings(photos_path, encodings_path)
     known_face_encodings, known_face_names = get_encodings(encodings_path)
-
-    video_capture = cv2.VideoCapture(0)
-    video_capture.set(cv2.CAP_PROP_FRAME_WIDTH, 300)
-    video_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 300)
-    video_capture.set(cv2.CAP_PROP_FPS, 2)
 
     # "Прогреваем" камеру, чтобы снимок не был тёмным
     # for i in range(30):
@@ -29,7 +24,7 @@ if __name__ == '__main__':
         ret, frame = video_capture.read()
         
         frame_number += 1
-        if frame_number % 24 != 0:
+        if frame_number % 50 != 0:
             cv2.imshow('Video', frame)
             # Hit 'q' on the keyboard to quit!
             if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -47,6 +42,7 @@ if __name__ == '__main__':
 
         # Loop through each face in this frame of video
         for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
+            flag = False
             # Scale back up face locations since the frame we detected in was scaled to 1/10 size
             # top *= 30
             # right *= 30
@@ -72,12 +68,14 @@ if __name__ == '__main__':
             # if matches[best_match_index]:
             #     name = known_face_names[best_match_index]
             else:
+                path = '.'
                 num_files = len([f for f in os.listdir('unknown/') if os.path.isfile(os.path.join('unknown/', f))]) 
                 # cv2.imwrite("unknown/" + datetime.datetime.now().strftime("%d-%m-%Y__%H:%M") + '.png', frame)
-                cv2.imwrite("unknown/Unknown_" + num_files + '.png', frame)
-                save_encodings("unknown/", encodings_path)
-                known_face_encodings, known_face_names = get_encodings(encodings_path)
-                print('DETECTED UNKNOWN PERSON ', "Unknown_" + num_files)          
+                cv2.imwrite("unknown/Unknown_" + str(num_files) + '.png', frame)
+                if save_encodings("unknown/", encodings_path) != -1:                
+                    print('DETECTED UNKNOWN PERSON ', "Unknown_" + str(num_files))
+                    flag = True
+                    break
 
             # Draw a label with a name below the face
             cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
@@ -88,9 +86,25 @@ if __name__ == '__main__':
         cv2.imshow('Video', frame)
 
         # Hit 'q' on the keyboard to quit!
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+        #if cv2.waitKey(1) & 0xFF == ord('q'):
+            #break
+        
+        if flag:
+            app(video_capture)
 
     # Release handle to the webcam
+    
+
+if __name__ == '__main__':
+    video_capture = cv2.VideoCapture(0)
+    # path = 'sudo modprobe bcm2835-v412 max_video_width=300 max_video_height=300'
+    # os.system(path)
+    # video_capture.set(3, 300)
+    # video_capture.set(4, 300)
+
+    # video_capture.set(cv2.CAP_PROP_FRAME_WIDTH, 300)
+    # video_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 300)
+    # video_capture.set(cv2.CAP_PROP_FPS, 2)
+    app(video_capture)
     video_capture.release()
     cv2.destroyAllWindows()
