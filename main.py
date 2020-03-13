@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 import face_recognition
 import datetime
+import os.path
+path = '.'
 from photomanager import save_encodings, get_encodings
 
 if __name__ == '__main__':
@@ -70,8 +72,12 @@ if __name__ == '__main__':
             # if matches[best_match_index]:
             #     name = known_face_names[best_match_index]
             else:
-                cv2.imwrite("unknown/" + datetime.datetime.now().strftime("%d-%m-%Y__%H:%M") + '.png', frame)
-                print('DETECTED UNKNOWN PERSON!')            
+                num_files = len([f for f in os.listdir('unknown/') if os.path.isfile(os.path.join('unknown/', f))]) 
+                # cv2.imwrite("unknown/" + datetime.datetime.now().strftime("%d-%m-%Y__%H:%M") + '.png', frame)
+                cv2.imwrite("unknown/Unknown_" + num_files + '.png', frame)
+                save_encodings("unknown/", encodings_path)
+                known_face_encodings, known_face_names = get_encodings(encodings_path)
+                print('DETECTED UNKNOWN PERSON ', "Unknown_" + num_files)          
 
             # Draw a label with a name below the face
             cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
