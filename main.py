@@ -1,10 +1,74 @@
+# -*- coding: utf-8 -*-
+# GUI URL: https://gist.github.com/Lukse/e5f9022f5944599c949ca24d1d4154a2#file-pyqt_opencv-py
+
+
+from PyQt4 import QtCore, QtGui, uic
+import sys
 import cv2
 import numpy as np
+import threading
+import time
+import queue
 import face_recognition
-import datetime
 import os.path
 import shutil
+from PyQt4.QtCore import pyqtSlot
 from photomanager import save_encodings, get_encodings
+
+
+running = False
+capture_thread = None
+form_class = uic.loadUiType("design.ui")[0]
+q = queue.Queue()
+
+photos_path = 'photos/'
+encodings_path = 'encodings/'
+known_face_encodings = None
+known_face_names = None
+frame_rec = None
+name_rec = 'Unknown'
+top_rec = right_rec = bottom_rec = left_rec = 0
+flag_known_face = False
+detected_unknown = False
+ 
+
+def grab(cam, queue, width, height, fps):
+    global running
+    capture = cv2.VideoCapture(cam)
+    capture.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+    capture.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+    capture.set(cv2.CAP_PROP_FPS, fps)
+    # app(capture)
+
+    while(running):
+        frame = {}
+        capture.grab()
+        retval, img = capture.retrieve(0)
+        frame["img"] = img
+
+        if queue.qsize() < 10:
+            queue.put(frame)
+        else:
+            print(queue.qsize())
+
+class OwnImageWidget(QtGui.QWidget):
+    def __init__(self, parent=None):
+        super(OwnImageWidget, self).__init__(parent)
+        self.image = None
+
+    def setImage(self, image):
+        self.image = image
+        sz = image.size()
+        self.setMinimumSize(sz)
+        self.update()
+
+    def paintEvent(self, event):
+        qp = QtGui.QPainter()
+        qp.begin(self)
+        if self.image:
+            qp.drawImage(QtCore.QPoint(0, 0), self.image)
+        qp.end()
+
 
 def draw_rectangle(frame, top, right, bottom, left, color):
     # Draw a box around the face
@@ -20,121 +84,166 @@ def draw_label(frame, name, top, right, bottom, left, color):
     cv2.putText(frame, name, (left + 6, bottom - 6), font, 1.0, (0, 0, 0), 1)
 
 
-def app(video_capture):
-    photos_path = 'photos/'
-    encodings_path = 'encodings/'
-    
+def initial():
     frame_rec = None
     name_rec = 'Unknown'
     top_rec = right_rec = bottom_rec = left_rec = 0
-    
     flag_known_face = False
-
+    detected_unknown = False
     save_encodings(photos_path, encodings_path)
     known_face_encodings, known_face_names = get_encodings(encodings_path)
-
     # 'Прогреваем' камеру, чтобы снимок не был тёмным
     # for i in range(30):
     #     video_capture.read()
+    return frame_rec, name_rec, top_rec, right_rec, bottom_rec, left_rec, flag_known_face, detected_unknown, known_face_encodings, known_face_names
 
-    frame_number = 0
-    
-    while True:        
-        # Grab a single frame of video
-        ret, frame = video_capture.read()
-        if flag_known_face:
-            draw_label(frame, name_rec, top_rec, right_rec, bottom_rec, left_rec, (0, 255, 0))
-            if name_rec.find('Unknown') != -1:
-            	if os.path.isfile('unknown/' + name_rec + 'png'):
+
+class MyWindowClass(QtGui.QMainWindow, form_class):
+    def __init__(self, parent=None):
+        QtGui.QMainWindow.__init__(self, parent)
+        self.setupUi(self)
+
+        self.startButton.clicked.connect(self.start_clicked)
+        
+        self.window_width = self.ImgWidget.frameSize().width()
+        self.window_height = self.ImgWidget.frameSize().height()
+        self.ImgWidget = OwnImageWidget(self.ImgWidget)
+
+        global qt_lineEdit_name
+        qt_lineEdit_name= self.lineEdit_name
+        global qt_bt_add
+        qt_bt_add = self.bt_add
+
+        self.timer = QtCore.QTimer(self)
+        self.timer.timeout.connect(self.update_frame)
+        self.timer.start(1)
+
+
+    def start_clicked(self):
+        global running
+        running = True
+        # ==============================
+
+        capture_thread.start()
+        self.startButton.setEnabled(False)
+        self.startButton.setText('Starting...')
+
+
+    def update_frame(self):
+        if not q.empty():
+            frame_rec, name_rec, top_rec, right_rec, bottom_rec, left_rec, flag_known_face, detected_unknown, known_face_encodings, known_face_names = initial()
+
+            self.startButton.setText('Camera is live')
+            frame = q.get()
+            img = frame["img"]
+
+            img_height, img_width, img_colors = img.shape
+            scale_w = float(self.window_width) / float(img_width)
+            scale_h = float(self.window_height) / float(img_height)
+            scale = min([scale_w, scale_h])
+
+            if scale == 0:
+                scale = 1
+
+            img = cv2.resize(img, None, fx=scale, fy=scale, interpolation = cv2.INTER_CUBIC)
+            # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            height, width, bpc = img.shape
+            bpl = bpc * width
+            image = QtGui.QImage(img.data, width, height, bpl, QtGui.QImage.Format_RGB888)
+
+            if flag_known_face:
+                draw_label(frame, name_rec, top_rec, right_rec, bottom_rec, left_rec, (0, 255, 0))
+                if name_rec.find('Unknown') != -1:
+                    if os.path.isfile('unknown/' + name_rec + 'png'):
                     # Move a file from the directory d1 to d2
                     # os.remove('unknown/' + name_rec + 'png')
-                    shutil.move('unknown/' + name_rec + 'png', 'known_photos_unnamed/' + name_rec + 'png')
-        
-        frame_number += 1
-        if frame_number % 50 != 0:
-            cv2.imshow('Video', frame)
-            # Hit 'q' on the keyboard to quit!
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-            continue
-        flag_known_face = False
+                        shutil.move('unknown/' + name_rec + 'png', 'known_photos_unnamed/' + name_rec + 'png')
 
-        # ================= Resize frame of video to 1/10 size for faster face recognition processing ===========================
-        # frame = cv2.resize(frame, (0, 0), fx=0.3, fy=0.3)
+            # Find all the faces and face enqcodings in the frame of video
+            face_locations = face_recognition.face_locations(img)
+            face_encodings = face_recognition.face_encodings(img, face_locations)
 
-        # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
-        rgb_frame = frame[:, :, ::-1]
+            # Loop through each face in this frame of video
+            for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
+                # Scale back up face locations since the frame we detected in was scaled to 1/10 size
+                # top *= 30
+                # right *= 30
+                # bottom *= 30
+                # left *= 30
 
-        # Find all the faces and face enqcodings in the frame of video
-        face_locations = face_recognition.face_locations(rgb_frame)
-        face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
+                # See if the face is a match for the known face(s)
+                draw_rectangle(img, top, right, bottom, left, (0, 0, 255))
+                # cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
+                matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
+                name = 'Unknown'
 
-        # Loop through each face in this frame of video
-        for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
-        	# Scale back up face locations since the frame we detected in was scaled to 1/10 size
-            # top *= 30
-            # right *= 30
-            # bottom *= 30
-            # left *= 30
+                # If a match was found in known_face_encodings, just use the first one.
+                if True in matches:
+                    first_match_index = matches.index(True)
+                    name = known_face_names[first_match_index]
+                    print('DETECTED ', name)
+                    frame_rec = img
+                    name_rec = name
+                    top_rec = top
+                    right_rec = right
+                    bottom_rec = bottom
+                    left_rec = left
+                    flag_known_face = True
+                    draw_label(frame_rec, name_rec, top_rec, right_rec, bottom_rec, left_rec, (0, 255, 0))
+                    cv2.imwrite('detected/' + name_rec + 'png', frame_rec)
+                    if "Unknown" in name:
+                        detected_unknown = True
 
-            # See if the face is a match for the known face(s)
-            draw_rectangle(frame, top, right, bottom, left, (0,0,255))
-            # cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
-            matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
-            name = 'Unknown'
 
-            # If a match was found in known_face_encodings, just use the first one.
-            if True in matches:
-                first_match_index = matches.index(True)
-                name = known_face_names[first_match_index]
-                print('DETECTED ', name)
-                frame_rec = frame
-                name_rec = name
-                top_rec = top
-                right_rec = right
-                bottom_rec = bottom
-                left_rec = left
-                flag_known_face = True
-                draw_label(frame_rec, name_rec, top_rec, right_rec, bottom_rec, left_rec, (0, 255, 0))
-                cv2.imwrite('detected/' + name_rec + 'png', frame_rec)
+                    # Or instead, use the known face with the smallest distance to the new face
+                    # face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
+                    # best_match_index = np.argmin(face_distances)
+                    # if matches[best_match_index]:
+                    #     name = known_face_names[best_match_index]
 
-                # Or instead, use the known face with the smallest distance to the new face
-	            # face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
-	            # best_match_index = np.argmin(face_distances)
-	            # if matches[best_match_index]:
-	            #     name = known_face_names[best_match_index]
+                else:
+                    path = '.'
+                    num_files = len([f for f in os.listdir('unknown/') if os.path.isfile(os.path.join('unknown/', f))])
+                    # cv2.imwrite('unknown/' + datetime.datetime.now().strftime('%d-%m-%Y__%H:%M') + '.png', frame)
+                    cv2.imwrite('unknown/Unknown_' + str(num_files) + '.png', img)
+                    if save_encodings('unknown/', encodings_path) != -1:
+                        print('DETECTED UNKNOWN PERSON ', 'Unknown_' + str(num_files))
+                        # flag_known_face = False
+                        break
+
+            self.ImgWidget.setImage(image)
+            if detected_unknown:
+                qt_lineEdit_name.setEnabled(True)
+                qt_bt_add.setEnabled(True)
+                if qt_lineEdit_name.text() != "":
+                    @pyqtSlot()
+                    def bt_add_clicked():
+                        # удаляем из папки Unknown
+                        os.remove('unknown/' + name_rec + 'png')
+                        shutil.move('detected/' + name_rec + 'png', 'detected/' + qt_lineEdit_name.text() + '.png')
+                        shutil.move('encodings/' + name_rec + 'pckl', 'encodings/' + qt_lineEdit_name.text() + '.pckl')
+                        # shutil.copy('detected/' + qt_lineEdit_name.text() + '.png', 'photos/')
+                        print("Person have been added to System!")
+                        qt_lineEdit_name.setText("")
+                    qt_bt_add.clicked.connect(bt_add_clicked)
+
 
             else:
-                path = '.'
-                num_files = len([f for f in os.listdir('unknown/') if os.path.isfile(os.path.join('unknown/', f))]) 
-                # cv2.imwrite('unknown/' + datetime.datetime.now().strftime('%d-%m-%Y__%H:%M') + '.png', frame)
-                cv2.imwrite('unknown/Unknown_' + str(num_files) + '.png', frame)
-                if save_encodings('unknown/', encodings_path) != -1:                
-                    print('DETECTED UNKNOWN PERSON ', 'Unknown_' + str(num_files))
-                    #flag_known_face = False
-                    break            
+                qt_lineEdit_name.setText("")
+                qt_lineEdit_name.setEnabled(False)
+                qt_bt_add.setEnabled(False)
 
-        # Display the resulting image
-        cv2.imshow('Video', frame)
-
-		# Hit 'q' on the keyboard to quit!
-        #if cv2.waitKey(1) & 0xFF == ord('q'):
-            #break
-        
-        if not flag_known_face:
-            app(video_capture)
+    def closeEvent(self, event):
+        global running
+        running = False
 
 
-if __name__ == '__main__':
-    video_capture = cv2.VideoCapture(0)
-    # path = 'sudo modprobe bcm2835-v412 max_video_width=300 max_video_height=300'
-    # os.system(path)
-    # video_capture.set(3, 300)
-    # video_capture.set(4, 300)
 
-    # video_capture.set(cv2.CAP_PROP_FRAME_WIDTH, 300)
-    # video_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 300)
-    # video_capture.set(cv2.CAP_PROP_FPS, 2)
-    app(video_capture)
-    video_capture.release()
-    cv2.destroyAllWindows()
+capture_thread = threading.Thread(target=grab, args = (0, q, 1920, 1080, 30))
+
+application = QtGui.QApplication(sys.argv)
+w = MyWindowClass(None)
+w.setWindowTitle('facerec')
+w.show()
+application.exec_()
