@@ -25,20 +25,26 @@ photos_path = 'photos/'
 encodings_path = 'encodings/'
 known_face_encodings = None
 known_face_names = None
+
+#global frame_rec
 frame_rec = None
+#global name_rec
 name_rec = 'Unknown'
+#global top_rec, right_rec, bottom_rec, left_rec
 top_rec = right_rec = bottom_rec = left_rec = 0
+#global flag_known_face
 flag_known_face = False
+#global detected_unknown
 detected_unknown = False
+frame_number = 0
  
 
-def grab(cam, queue, width, height, fps):
+def grab(cam, queue, width, height):
     global running
     capture = cv2.VideoCapture(cam)
-    capture.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-    capture.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-    capture.set(cv2.CAP_PROP_FPS, fps)
-    # app(capture)
+    # capture.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+    # capture.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+    # capture.set(cv2.CAP_PROP_FPS, fps)
 
     while(running):
         frame = {}
@@ -84,18 +90,11 @@ def draw_label(frame, name, top, right, bottom, left, color):
     cv2.putText(frame, name, (left + 6, bottom - 6), font, 1.0, (0, 0, 0), 1)
 
 
-def initial():
-    frame_rec = None
-    name_rec = 'Unknown'
-    top_rec = right_rec = bottom_rec = left_rec = 0
-    flag_known_face = False
-    detected_unknown = False
-    save_encodings(photos_path, encodings_path)
-    known_face_encodings, known_face_names = get_encodings(encodings_path)
+# def initial():
     # 'Прогреваем' камеру, чтобы снимок не был тёмным
     # for i in range(30):
     #     video_capture.read()
-    return frame_rec, name_rec, top_rec, right_rec, bottom_rec, left_rec, flag_known_face, detected_unknown, known_face_encodings, known_face_names
+    # return known_face_encodings, known_face_names
 
 
 class MyWindowClass(QtGui.QMainWindow, form_class):
@@ -130,12 +129,30 @@ class MyWindowClass(QtGui.QMainWindow, form_class):
 
 
     def update_frame(self):
-        if not q.empty():
-            frame_rec, name_rec, top_rec, right_rec, bottom_rec, left_rec, flag_known_face, detected_unknown, known_face_encodings, known_face_names = initial()
+        global frame_rec
+        global name_rec
+        global top_rec, right_rec, bottom_rec, left_rec
+        global flag_known_face
+        global detected_unknown
+        global frame_number
 
+        if not q.empty():
+            start_time_update = time.time()
             self.startButton.setText('Camera is live')
             frame = q.get()
             img = frame["img"]
+
+            global flag_known_face
+            
+            start_time_save_encodings = time.time()
+            save_encodings(photos_path, encodings_path)
+            print(f'=======  Time to save encoding(s): {time.time()-start_time_save_encodings} seconds. =======')
+            
+            start_time_get_encodings = time.time()
+            known_face_encodings, known_face_names = get_encodings(encodings_path)
+            print(f'=======  Time to get encoding(s): {time.time()-start_time_get_encodings} seconds. =======')
+
+            # frame_rec, name_rec, top_rec, right_rec, bottom_rec, left_rec, flag_known_face, detected_unknown, known_face_encodings, known_face_names = initial()
 
             img_height, img_width, img_colors = img.shape
             scale_w = float(self.window_width) / float(img_width)
@@ -153,86 +170,92 @@ class MyWindowClass(QtGui.QMainWindow, form_class):
             image = QtGui.QImage(img.data, width, height, bpl, QtGui.QImage.Format_RGB888)
 
             if flag_known_face:
-                draw_label(frame, name_rec, top_rec, right_rec, bottom_rec, left_rec, (0, 255, 0))
+                draw_label(img, name_rec, top_rec, right_rec, bottom_rec, left_rec, (0, 255, 0))
                 if name_rec.find('Unknown') != -1:
                     if os.path.isfile('unknown/' + name_rec + 'png'):
                     # Move a file from the directory d1 to d2
                     # os.remove('unknown/' + name_rec + 'png')
                         shutil.move('unknown/' + name_rec + 'png', 'known_photos_unnamed/' + name_rec + 'png')
+            
+            frame_number += 1
+            if frame_number % 30 == 0:
+                start_time = time.time()
+                # Find all the faces and face enqcodings in the frame of video
+                face_locations = face_recognition.face_locations(img)
+                face_encodings = face_recognition.face_encodings(img, face_locations)
+                print(f'======= Время поиска лица на изображении: {time.time()-start_time} seconds. =======')
 
-            # Find all the faces and face enqcodings in the frame of video
-            face_locations = face_recognition.face_locations(img)
-            face_encodings = face_recognition.face_encodings(img, face_locations)
+                # Loop through each face in this frame of video
+                for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
+                    # Scale back up face locations since the frame we detected in was scaled to 1/10 size
+                    # top *= 30
+                    # right *= 30
+                    # bottom *= 30
+                    # left *= 30
 
-            # Loop through each face in this frame of video
-            for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
-                # Scale back up face locations since the frame we detected in was scaled to 1/10 size
-                # top *= 30
-                # right *= 30
-                # bottom *= 30
-                # left *= 30
+                    # See if the face is a match for the known face(s)
+                    draw_rectangle(img, top, right, bottom, left, (0, 0, 255))
+                    # cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
+                    matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
+                    name = 'Unknown'
 
-                # See if the face is a match for the known face(s)
-                draw_rectangle(img, top, right, bottom, left, (0, 0, 255))
-                # cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
-                matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
-                name = 'Unknown'
-
-                # If a match was found in known_face_encodings, just use the first one.
-                if True in matches:
-                    first_match_index = matches.index(True)
-                    name = known_face_names[first_match_index]
-                    print('DETECTED ', name)
-                    frame_rec = img
-                    name_rec = name
-                    top_rec = top
-                    right_rec = right
-                    bottom_rec = bottom
-                    left_rec = left
-                    flag_known_face = True
-                    draw_label(frame_rec, name_rec, top_rec, right_rec, bottom_rec, left_rec, (0, 255, 0))
-                    cv2.imwrite('detected/' + name_rec + 'png', frame_rec)
-                    if "Unknown" in name:
-                        detected_unknown = True
+                    # If a match was found in known_face_encodings, just use the first one.
+                    if True in matches:
+                        first_match_index = matches.index(True)
+                        name = known_face_names[first_match_index]
+                        print('DETECTED ', name)
+                        frame_rec = img
+                        name_rec = name
+                        top_rec = top
+                        right_rec = right
+                        bottom_rec = bottom
+                        left_rec = left
+                        flag_known_face = True
+                        draw_label(frame_rec, name_rec, top_rec, right_rec, bottom_rec, left_rec, (0, 255, 0))
+                        cv2.imwrite('detected/' + name_rec + 'png', frame_rec)
+                        if "Unknown" in name:
+                            detected_unknown = True
 
 
-                    # Or instead, use the known face with the smallest distance to the new face
-                    # face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
-                    # best_match_index = np.argmin(face_distances)
-                    # if matches[best_match_index]:
-                    #     name = known_face_names[best_match_index]
+                        # Or instead, use the known face with the smallest distance to the new face
+                        # face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
+                        # best_match_index = np.argmin(face_distances)
+                        # if matches[best_match_index]:
+                        #     name = known_face_names[best_match_index]
 
+                    else:
+                        path = '.'
+                        num_files = len([f for f in os.listdir('unknown/') if os.path.isfile(os.path.join('unknown/', f))])
+                        # cv2.imwrite('unknown/' + datetime.datetime.now().strftime('%d-%m-%Y__%H:%M') + '.png', frame)
+                        cv2.imwrite('unknown/Unknown_' + str(num_files) + '.png', img)
+                        if save_encodings('unknown/', encodings_path) != -1:
+                            print('DETECTED UNKNOWN PERSON ', 'Unknown_' + str(num_files))
+                            flag_known_face = False
+                            break
+                
+                if detected_unknown:
+                    qt_lineEdit_name.setEnabled(True)
+                    qt_bt_add.setEnabled(True)
+                    if qt_lineEdit_name.text() != "":
+                        @pyqtSlot()
+                        def bt_add_clicked():
+                            # удаляем из папки Unknown
+                            try:
+                                os.remove('unknown/' + name_rec + 'png')
+                            except Exception as e:
+                                pass                            
+                            shutil.move('detected/' + name_rec + 'png', 'detected/' + qt_lineEdit_name.text() + '.png')
+                            shutil.move('encodings/' + name_rec + 'pckl', 'encodings/' + qt_lineEdit_name.text() + '.pckl')
+                            # shutil.copy('detected/' + qt_lineEdit_name.text() + '.png', 'photos/')
+                            print("Person have been added to System!")
+                            qt_lineEdit_name.setText("")
+                        qt_bt_add.clicked.connect(bt_add_clicked)
                 else:
-                    path = '.'
-                    num_files = len([f for f in os.listdir('unknown/') if os.path.isfile(os.path.join('unknown/', f))])
-                    # cv2.imwrite('unknown/' + datetime.datetime.now().strftime('%d-%m-%Y__%H:%M') + '.png', frame)
-                    cv2.imwrite('unknown/Unknown_' + str(num_files) + '.png', img)
-                    if save_encodings('unknown/', encodings_path) != -1:
-                        print('DETECTED UNKNOWN PERSON ', 'Unknown_' + str(num_files))
-                        # flag_known_face = False
-                        break
-
+                    qt_lineEdit_name.setText("")
+                    qt_lineEdit_name.setEnabled(False)
+                    qt_bt_add.setEnabled(False)
             self.ImgWidget.setImage(image)
-            if detected_unknown:
-                qt_lineEdit_name.setEnabled(True)
-                qt_bt_add.setEnabled(True)
-                if qt_lineEdit_name.text() != "":
-                    @pyqtSlot()
-                    def bt_add_clicked():
-                        # удаляем из папки Unknown
-                        os.remove('unknown/' + name_rec + 'png')
-                        shutil.move('detected/' + name_rec + 'png', 'detected/' + qt_lineEdit_name.text() + '.png')
-                        shutil.move('encodings/' + name_rec + 'pckl', 'encodings/' + qt_lineEdit_name.text() + '.pckl')
-                        # shutil.copy('detected/' + qt_lineEdit_name.text() + '.png', 'photos/')
-                        print("Person have been added to System!")
-                        qt_lineEdit_name.setText("")
-                    qt_bt_add.clicked.connect(bt_add_clicked)
-
-
-            else:
-                qt_lineEdit_name.setText("")
-                qt_lineEdit_name.setEnabled(False)
-                qt_bt_add.setEnabled(False)
+            print(f'======= Время обработки кадра: {time.time()-start_time_update} seconds. =======')
 
     def closeEvent(self, event):
         global running
@@ -240,7 +263,8 @@ class MyWindowClass(QtGui.QMainWindow, form_class):
 
 
 
-capture_thread = threading.Thread(target=grab, args = (0, q, 1920, 1080, 30))
+# capture_thread = threading.Thread(target=grab, args = (0, q, 1920, 1080, 2))
+capture_thread = threading.Thread(target=grab, args = (0, q, 1920, 1080))
 
 application = QtGui.QApplication(sys.argv)
 w = MyWindowClass(None)
