@@ -47,7 +47,7 @@ def app(video_capture):
             if name_rec.find('Unknown') != -1:
             	if os.path.isfile('unknown/' + name_rec + 'png'):
                     # Move a file from the directory d1 to d2
-                    # os.remove('unknown/' + name_rec + 'png')
+                    # os.remove('unknown/' + NAME_REC + 'png')
                     shutil.move('unknown/' + name_rec + 'png', 'known_photos_unnamed/' + name_rec + 'png')
         
         frame_number += 1
@@ -83,7 +83,7 @@ def app(video_capture):
             matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
             name = 'Unknown'
 
-            # If a match was found in known_face_encodings, just use the first one.
+            # If a match was found in KNOWN_FACE_ENCODINGS, just use the first one.
             if True in matches:
                 first_match_index = matches.index(True)
                 name = known_face_names[first_match_index]
@@ -99,10 +99,10 @@ def app(video_capture):
                 cv2.imwrite('detected/' + name_rec + 'png', frame_rec)
 
                 # Or instead, use the known face with the smallest distance to the new face
-	            # face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
+	            # face_distances = face_recognition.face_distance(KNOWN_FACE_ENCODINGS, face_encoding)
 	            # best_match_index = np.argmin(face_distances)
 	            # if matches[best_match_index]:
-	            #     name = known_face_names[best_match_index]
+	            #     name = KNOWN_FACE_NAMES[best_match_index]
 
             else:
                 path = '.'
@@ -111,7 +111,7 @@ def app(video_capture):
                 cv2.imwrite('unknown/Unknown_' + str(num_files) + '.png', frame)
                 if save_encodings('unknown/', encodings_path) != -1:                
                     print('DETECTED UNKNOWN PERSON ', 'Unknown_' + str(num_files))
-                    #flag_known_face = False
+                    #FLAG_KNOWN_FACE = False
                     break            
 
         # Display the resulting image
