@@ -2,26 +2,40 @@ from os import listdir
 import os.path
 import face_recognition
 import pickle
+import time
 
 
 def save_encodings_by_photos(photos_folder, encodings_folder):
     for photo_file in listdir(photos_folder):
-        if not os.path.isfile(encodings_folder+photo_file[:-4]+".pckl"):
-            name = photo_file
-            print(f"I haven't encoding for {name}. Try to generate it...")
-            image = face_recognition.load_image_file(photos_folder + name)
-            if len(image) > 0:
-                print('Image exists!')
+        if not os.path.isfile(encodings_folder+photo_file[:-4]+".pckl"): # если encoding для этого изображения не существует
+            print(f"I haven't encoding for {photo_file}. Try to generate it...")
+            start_time = time.time()
+            image = face_recognition.load_image_file(photos_folder + photo_file)
             encoding = face_recognition.face_encodings(image)
             if len(encoding) > 0:
-                print(f"FACE ENCODING:\n{str(encoding)}")
-                new_encoding = face_recognition.face_encodings(image)[0]
-                with open(encodings_folder + name[:-4] + ".pckl", "wb") as new_encoding_file:
-                    pickle.dump(new_encoding, new_encoding_file)
-                    print('Encoding %s have been saved!' % (encodings_folder + name[:-4] + ".pckl"))
+                with open(encodings_folder + photo_file[:-4] + ".pckl", "wb") as new_encoding_file:
+                    pickle.dump(encoding[0], new_encoding_file)
+                    print(f'Encoding {encodings_folder + photo_file[:-4]}.pckl have been saved!' )
+                    print(f'=== Время сохранения encoding для {photo_file}: {time.time() - start_time} секунд. ===\n\n')
             else:
                 print("Ooops, I couldn't recognize the face!\n")
                 return -1
+
+
+def save_one_encoding_by_photo(photo_folder, photo_file, encodings_folder):
+    if not os.path.isfile(encodings_folder+photo_file[:-4]+".pckl"): # если encoding для этого изображения не существует
+        print(f"I haven't encoding for {photo_file}. Try to generate it...")
+        start_time = time.time()
+        image = face_recognition.load_image_file(photo_folder + photo_file)
+        encoding = face_recognition.face_encodings(image)
+        if len(encoding) > 0:
+            with open(encodings_folder + photo_file[:-4] + ".pckl", "wb") as new_encoding_file:
+                pickle.dump(encoding[0], new_encoding_file)
+                print(f'Encoding {encodings_folder + photo_file[:-4]}.pckl have been saved!' )
+                print(f'=== Время сохранения encoding для {photo_file}: {time.time() - start_time} секунд. ===\n\n')
+        else:
+            print("Ooops, I couldn't recognize the face!\n")
+            return -1
 
 
 def get_encodings(encoding_path):

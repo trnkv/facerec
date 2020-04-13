@@ -1,0 +1,14 @@
+=== Ubuntu / Linux Mint ===
+
+sudo apt install python3-pip
+pip3 install opencv-python
+pip3 install scikit-build
+sudo apt install build-essential
+sudo apt install python3-dev
+wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2 >/dev/null | sudo apt-key add -
+sudo apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main'
+sudo apt-get update
+sudo apt-get install cmake
+pip3 install dlib
+pip3 install face_recognition
+sudo apt-get install python3-pyqt4
