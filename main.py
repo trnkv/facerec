@@ -128,7 +128,7 @@ class MyWindowClass(QtGui.QMainWindow, FORM_CLASS):
             if scale == 0:
                 scale = 1
 
-            img = cv2.resize(img, None, fx=scale, fy=scale, interpolation = cv2.INTER_CUBIC)
+            img = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
             # small_frame = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
             # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -195,7 +195,7 @@ class MyWindowClass(QtGui.QMainWindow, FORM_CLASS):
         RUNNING = False
 
 
-CAPTURE_THREAD = threading.Thread(target=grab, args=(0, QUEUE, 100, 100))
+CAPTURE_THREAD = threading.Thread(target=grab, args=(0, QUEUE, 200, 200))
 
 APPLICATION = QtGui.QApplication(sys.argv)
 WINDOW = MyWindowClass(None)
