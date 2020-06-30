@@ -22,7 +22,7 @@ CAPTURE_THREAD = None
 FORM_CLASS = uic.loadUiType("design.ui")[0]
 QUEUE = queue.Queue()
 
-PHOTOS_PATH = 'dataset/'
+PHOTOS_PATH = 'photos/'
 ENCODINGS_PATH = 'encodings/'
 
 START_TIME_SAVE_ENCODINGS = time.time()
@@ -199,10 +199,10 @@ class MyWindowClass(QtGui.QMainWindow, FORM_CLASS):
                     file_log.write(log + '\n')
                     file_log.close()
                     draw_label(img, name, top, right, bottom, left, (0, 255, 0))
-                    cv2.imwrite('detected/' + name + 'png', img)
+                    cv2.imwrite('detected/' + name + 'png', cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
                 else:
                     num_files = len([f for f in os.listdir('unknown/') if os.path.isfile(os.path.join('unknown/', f))])
-                    cv2.imwrite('unknown/Unknown_' + str(num_files) + '.png', img)
+                    cv2.imwrite('unknown/Unknown_' + str(num_files) + '.png', cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
                     if save_encodings_by_photos('unknown/', ENCODINGS_PATH) != -1:
                         print('DETECTED UNKNOWN PERSON ', 'Unknown_' + str(num_files))
             self.ImgWidget.setImage(image)
@@ -214,7 +214,7 @@ class MyWindowClass(QtGui.QMainWindow, FORM_CLASS):
         RUNNING = False
 
 
-CAPTURE_THREAD = threading.Thread(target=grab, args=(0, QUEUE, 500, 500, 30))
+CAPTURE_THREAD = threading.Thread(target=grab, args=(0, QUEUE, 200, 200, 30))
 
 APPLICATION = QtGui.QApplication(sys.argv)
 WINDOW = MyWindowClass(None)
