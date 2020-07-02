@@ -10,10 +10,12 @@ import queue
 import os.path
 
 from PyQt4 import QtCore, QtGui, uic
+
 import cv2
 import numpy as np
 import face_recognition
-
+import pyscreenshot as ImageGrab
+from PIL import Image
 from photomanager import save_encodings_by_photos, get_encodings
 
 
@@ -35,18 +37,23 @@ KNOWN_FACE_ENCODINGS, KNOWN_FACE_NAMES = get_encodings(ENCODINGS_PATH)
 def grab(cam, queue, width, height, fps):
     global RUNNING
     capture = cv2.VideoCapture(cam)
-    capture.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-    capture.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+    # capture.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+    # capture.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
     capture.set(cv2.CAP_PROP_FPS, fps)
+    capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
     while(RUNNING):
         frame = {}
         capture.grab()
-        retval, img = capture.retrieve(0)
-        frame["img"] = img
+        retval, img = capture.read(0)
+        img = cv2.resize(img, (200, 200))
+        cv2.imwrite('image.png', img)
+        # print(f'###### [SHAPE] {img.shape}')
+        frame["img"] = cv2.imread('image.png')
 
-        if queue.qsize() < 10:
+        if queue.qsize() < 1:
             queue.put(frame)
+#             time.sleep(1)
         else:
             print(queue.qsize())
 
@@ -114,6 +121,11 @@ class MyWindowClass(QtGui.QMainWindow, FORM_CLASS):
             # start_time_update = time.time()
             self.startButton.setText('Camera is live')
             frame = QUEUE.get()
+#             img = np.array(ImageGrab.grab(bbox=(10, 10, 210, 210)))
+#             img = Image.fromarray(img, 'RGB')
+            # img = ImageGrab.grab(bbox=(10, 10, 210, 210))  # X1,Y1,X2,Y2
+            # img = np.asanyarray(img)
+            # frame = cv2.cvtColor(img_np, cv2.COLOR_BGR2GRAY)
             img = frame["img"]
 
             img_height, img_width, img_colors = img.shape
@@ -133,20 +145,20 @@ class MyWindowClass(QtGui.QMainWindow, FORM_CLASS):
             # print(f'=======  Время получения начальных encodings: {time.time()-start_time_get_encodings} seconds. =======')
 
             # img = cv2.resize(img, (0, 0), fx=0.1, fy=0.1)
-            small_img = cv2.resize(img, (0, 0), fx=0.25, fy=0.25)
+            # small_img = cv2.resize(img, (0, 0), fx=0.25, fy=0.25)
             # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
-            small_img = cv2.cvtColor(small_img, cv2.COLOR_BGR2RGB)
+            small_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             # rgb_small_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)           
 
             print(f'[SHAPE] {small_img.shape}')
 
             # start_time = time.time()
             # Find all the faces and face encodings in the current frame of video
-            face_locations = face_recognition.face_locations(small_img)
+            face_locations = face_recognition.face_locations(img)
             # print(f'======= Время поиска лица на изображении: {time.time()-start_time} seconds. =======')
 
             # start_time = time.time()
-            face_encodings = face_recognition.face_encodings(small_img, face_locations)
+            face_encodings = face_recognition.face_encodings(img, face_locations)
             # face_locations = face_recognition.face_locations(rgb_small_frame)
             # face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
             # print(f'======= Время составления encoding для лица: {time.time()-start_time} seconds. =======')
@@ -176,10 +188,10 @@ class MyWindowClass(QtGui.QMainWindow, FORM_CLASS):
                     # Display the results
                     for (top, right, bottom, left) in face_locations:
                         # Scale back up face locations since the frame we detected in was scaled to 1/10 size
-                        top *= 4
-                        right *= 4
-                        bottom *= 4
-                        left *= 4
+                        # top *= 4
+                        # right *= 4
+                        # bottom *= 4
+                        # left *= 4
 
                         # Draw a box around the face
                         # draw_rectangle(img, top + 30, right, bottom, left - 30, (255, 0, 0))
@@ -206,6 +218,7 @@ class MyWindowClass(QtGui.QMainWindow, FORM_CLASS):
                     if save_encodings_by_photos('unknown/', ENCODINGS_PATH) != -1:
                         print('DETECTED UNKNOWN PERSON ', 'Unknown_' + str(num_files))
             self.ImgWidget.setImage(image)
+#             time.sleep(1)
             # print(f'======= Время обработки кадра: {time.time()-start_time_update} seconds. =======')
     # print(f'[TIME] Время обработки одного кадра: {timeit.timeit("update_frame()", setup="from __main__ import update_frame", number=1)}')
 
