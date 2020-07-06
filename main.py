@@ -14,8 +14,8 @@ from PyQt4 import QtCore, QtGui, uic
 import cv2
 import numpy as np
 import face_recognition
-import pyscreenshot as ImageGrab
-from PIL import Image
+# import pyscreenshot as ImageGrab
+# from PIL import Image
 from photomanager import save_encodings_by_photos, get_encodings
 
 
