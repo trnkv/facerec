@@ -147,13 +147,13 @@ class MyWindowClass(QtGui.QMainWindow, FORM_CLASS):
             known_face_encodings, known_face_names = get_encodings(ENCODINGS_PATH)
             # print(f'=======  Время получения начальных encodings: {time.time()-start_time_get_encodings} seconds. =======')
 
-            img = cv2.resize(img, (200,200))
+            img = cv2.resize(img, (200, 200))
             # small_img = cv2.resize(img, (0, 0), fx=0.25, fy=0.25)
             # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
-            #small_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            # small_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             # rgb_small_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)           
 
-            #print(f'[SHAPE] {small_img.shape}')
+            # print(f'[SHAPE] {small_img.shape}')
 
             # start_time = time.time()
             # Find all the faces and face encodings in the current frame of video
