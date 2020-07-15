@@ -8,6 +8,7 @@ import timeit
 import datetime
 import queue
 import os.path
+import pathlib
 
 from PyQt4 import QtCore, QtGui, uic
 
@@ -15,7 +16,11 @@ import cv2
 import numpy as np
 import face_recognition
 # import pyscreenshot as ImageGrab
+<<<<<<< HEAD
+from PIL import Image
+=======
 # from PIL import Image
+>>>>>>> 41a3c686a5f21cd853a3ea4eba4a619ac3a7c4f7
 from photomanager import save_encodings_by_photos, get_encodings
 
 
@@ -26,6 +31,8 @@ QUEUE = queue.Queue()
 
 PHOTOS_PATH = 'photos/'
 ENCODINGS_PATH = 'encodings/'
+
+THE_SAME_PERSON = False
 
 START_TIME_SAVE_ENCODINGS = time.time()
 save_encodings_by_photos(PHOTOS_PATH, ENCODINGS_PATH)
@@ -144,13 +151,20 @@ class MyWindowClass(QtGui.QMainWindow, FORM_CLASS):
             known_face_encodings, known_face_names = get_encodings(ENCODINGS_PATH)
             # print(f'=======  Время получения начальных encodings: {time.time()-start_time_get_encodings} seconds. =======')
 
+<<<<<<< HEAD
+            img = cv2.resize(img, (200,200))
+            # small_img = cv2.resize(img, (0, 0), fx=0.25, fy=0.25)
+            # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
+            #small_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+=======
             # img = cv2.resize(img, (0, 0), fx=0.1, fy=0.1)
             # small_img = cv2.resize(img, (0, 0), fx=0.25, fy=0.25)
             # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
             small_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+>>>>>>> 41a3c686a5f21cd853a3ea4eba4a619ac3a7c4f7
             # rgb_small_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)           
 
-            print(f'[SHAPE] {small_img.shape}')
+            #print(f'[SHAPE] {small_img.shape}')
 
             # start_time = time.time()
             # Find all the faces and face encodings in the current frame of video
@@ -199,17 +213,21 @@ class MyWindowClass(QtGui.QMainWindow, FORM_CLASS):
                         draw_label(img, name, top, right, bottom, left, (0, 0, 0))
                     
                     print('DETECTED ', name)
-                    log = ''
-                    if "Unknown" in name:
-                        log = f"{datetime.datetime.now().strftime('%H:%M')} UNKNOWN: {name}"
-                        QT_textBrowser.append(log)
-                    else:
-                        log = f"{datetime.datetime.now().strftime('%H:%M')} Detected: {name}"
-                        QT_textBrowser.append(log)
+
                     # создаем лог-файл для текущей сессии
-                    file_log = open(f"logs/log_{datetime.datetime.now().strftime('%d-%m-%y')}", 'a+')
-                    file_log.write(log + '\n')
-                    file_log.close()
+                    with open(f"logs/log_{datetime.datetime.now().strftime('%d-%m-%y')}.txt", "a+") as file_log:
+                        file_log.seek(0)  # ставим курсор на начало файла, т. к. в режиме a+ он по умолчанию в конце
+                        try:
+                            n = file_log.readlines()[-1][16:-1]
+                            if name != n:
+                                log = f"{datetime.datetime.now().strftime('%H:%M')} Detected: {name}"
+                                QT_textBrowser.append(log)
+                                file_log.write(log + '\n')
+                        except IndexError:
+                            log = f"{datetime.datetime.now().strftime('%d-%m-%y')}\n"
+                            file_log.write(log + '\n')
+
+                        file_log.close()
                     draw_label(img, name, top, right, bottom, left, (0, 255, 0))
                     cv2.imwrite('detected/' + name + 'png', cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
                 else:
@@ -234,3 +252,4 @@ WINDOW = MyWindowClass(None)
 WINDOW.setWindowTitle('facerec')
 WINDOW.show()
 APPLICATION.exec_()
+
