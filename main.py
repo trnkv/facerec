@@ -202,7 +202,7 @@ class MyWindowClass(QtGui.QMainWindow, FORM_CLASS):
             if match_founded:
                 # создаем или открываем лог-файл для текущей сессии
                 with open(f"logs/log_{datetime.datetime.now().strftime('%d-%m-%y')}.txt", "a+") as file_log:
-                    file_log.seek(0)  # ставим курсор на начало файла, т. к. в режиме a+ он по умолчанию в конце
+                    # file_log.seek(0)  # ставим курсор на начало файла, т. к. в режиме a+ он по умолчанию в конце
                     text_in_textBrowser = QT_textBrowser.toPlainText()
                     name_in_last_line = text_in_textBrowser[text_in_textBrowser.rfind(' ') + 1:]
                     if name != name_in_last_line:
