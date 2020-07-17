@@ -16,7 +16,7 @@ from PyQt4 import QtCore, QtGui, uic
 import pyttsx3
 
 import cv2
-# import numpy as np
+import numpy as np
 import face_recognition
 import pickle
 # import pyscreenshot as ImageGrab
@@ -169,23 +169,24 @@ class MyWindowClass(QtGui.QMainWindow, FORM_CLASS):
                 # See if the face is a match for the known face(s)
                 matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
                 name = "Unknown"
-                # # Use the known face with the smallest distance to the new face
+                # Use the known face with the smallest distance to the new face
                 # start_time = time.time()                                              ######################## очень долго (6-8 мс на ноуте)! ###############################
-                # face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
-                # best_match_index = np.argmin(face_distances)
-                # if matches[best_match_index]:
-                #     name = known_face_names[best_match_index]
-                #     face_names.append(name)
-                #     print(f'[TIME] Нахожу похожее лицо: {time.time() - start_time}')  ######################## очень долго (6-8 мс на ноуте)! ###############################
+                face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
+                best_match_index = np.argmin(face_distances)
+                if matches[best_match_index]:
+                    name = known_face_names[best_match_index]
+                    face_names.append(name)
+                    match_founded = True
+                    # print(f'[TIME] Нахожу похожее лицо: {time.time() - start_time}')  ######################## очень долго (6-8 мс на ноуте)! ###############################
 
                 # If a match was found in known_face_encodings, just use the first one.
                 # start_time = time.time()                                              ########### 1-2 мс на ноуте ###########
-                if True in matches:  # если совпадение нашли
-                    first_match_index = matches.index(True)
-                    name = known_face_names[first_match_index]
-                    face_names.append(name)
-                    # print(f"[TIME] Нахожу похожее лицо: {time.time() - start_time}")  ########### 1-2 мс на ноуте ###########
-                    match_founded = True
+                # if True in matches:  # если совпадение нашли
+                #     first_match_index = matches.index(True)
+                #     name = known_face_names[first_match_index]
+                #     face_names.append(name)
+                #     # print(f"[TIME] Нахожу похожее лицо: {time.time() - start_time}")  ########### 1-2 мс на ноуте ###########
+                #     match_founded = True
 
                     # Display the results
                     # for (top, right, bottom, left) in face_locations:
@@ -198,7 +199,7 @@ class MyWindowClass(QtGui.QMainWindow, FORM_CLASS):
             # рисуем лейбл(ы)
             for (top, right, bottom, left), name in zip(face_locations, face_names):
                 draw_label(img, name, top, right, bottom, left, (0, 255, 0))
-            
+
             if match_founded:
                 # создаем или открываем лог-файл для текущей сессии
                 with open(f"logs/log_{datetime.datetime.now().strftime('%d-%m-%y')}.txt", "a+") as file_log:
