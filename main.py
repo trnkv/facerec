@@ -8,7 +8,7 @@ import datetime
 import queue
 import os.path
 
-from PyQt4 import QtCore, QtGui, uic
+from PyQt5 import QtCore, QtGui, QtWidgets, uic
 import cv2
 import face_recognition
 
@@ -49,7 +49,7 @@ def grab(cam, queue, width, height):
             print(queue.qsize())
 
 
-class OwnImageWidget(QtGui.QWidget):
+class OwnImageWidget(QtWidgets.QWidget):
     def __init__(self, parent=None):
         super(OwnImageWidget, self).__init__(parent)
         self.image = None
@@ -82,9 +82,9 @@ def draw_label(frame, name, top, right, bottom, left, color):
     cv2.putText(frame, name, (left + 2, bottom - 6), font, 0.5, (0, 0, 0), 1)
 
 
-class MyWindowClass(QtGui.QMainWindow, FORM_CLASS):
+class MyWindowClass(QtWidgets.QMainWindow, FORM_CLASS):
     def __init__(self, parent=None):
-        QtGui.QMainWindow.__init__(self, parent)
+        QtWidgets.QMainWindow.__init__(self, parent)
         self.setupUi(self)
         self.startButton.clicked.connect(self.start_clicked)
         self.window_width = self.ImgWidget.frameSize().width()
@@ -197,7 +197,7 @@ class MyWindowClass(QtGui.QMainWindow, FORM_CLASS):
 
 CAPTURE_THREAD = threading.Thread(target=grab, args=(0, QUEUE, 200, 200))
 
-APPLICATION = QtGui.QApplication(sys.argv)
+APPLICATION = QtWidgets.QApplication(sys.argv)
 WINDOW = MyWindowClass(None)
 WINDOW.setWindowTitle('facerec')
 WINDOW.show()

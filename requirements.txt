@@ -1,4 +1,5 @@
 opencv-python
+scikit-build
 numpy
 face_recognition
 pickle
