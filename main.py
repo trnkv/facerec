@@ -7,12 +7,13 @@ import time
 import datetime
 import queue
 import os.path
+from pprint import pprint
 
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
 import cv2
 import face_recognition
 
-#import pyttsx3  # синтезатор голоса
+import pyttsx3  # синтезатор голоса
 from espeakng import ESpeakNG  # синтезатор голоса
 import speech_recognition as sr  # распознавание речи
 
@@ -26,9 +27,10 @@ QUEUE = queue.Queue()
 
 PHOTOS_PATH = 'photos/'
 ENCODINGS_PATH = 'encodings/'
-LOG_FILENAME = f"logs/log_{datetime.datetime.now().strftime('%d-%m-%y')}"
-VISITORS_FILENAME = f"logs/events/visitors_{datetime.datetime.now().strftime('%d-%m-%y')}"
-SEARCH_FILENAME = f"logs/events/search_{datetime.datetime.now().strftime('%d-%m-%y')}"
+LOG_FILENAME = f"logs/log_{datetime.datetime.now().strftime('%d-%m-%y')}.txt"
+VISITORS_FILENAME = f"logs/events/visitors_{datetime.datetime.now().strftime('%d-%m-%y')}.txt"
+SEARCH_FILENAME = f"logs/events/search_{datetime.datetime.now().strftime('%d-%m-%y')}.txt"
+HEARD_FILE = f"logs/events/heard_{datetime.datetime.now().strftime('%d-%m-%y')}.txt"
 
 START_TIME_SAVE_ENCODINGS = time.time()
 save_encodings_by_photos(PHOTOS_PATH, ENCODINGS_PATH)
@@ -37,12 +39,18 @@ print(f'=======  Time to save encoding(s): {time.time()-START_TIME_SAVE_ENCODING
 KNOWN_FACE_ENCODINGS, KNOWN_FACE_NAMES = get_encodings(ENCODINGS_PATH)
 
 
+def write_event(file, message):
+    file_log = open(file, 'a+', encoding='utf-8')
+    file_log.write(message + '\n')
+    file_log.close()
+
+
 def say_was(search_name):
         """
         проходим по файлу VISITORS_FILENAME, ищем имя
         читаем вслух последнюю строку, когда был человек
         """
-        visitors_file = open(VISITORS_FILENAME, r)
+        visitors_file = open(VISITORS_FILENAME, 'r', encoding='utf-8')
         all_lines = visitors_file.readlines()
         last_string = ""
 
@@ -52,8 +60,10 @@ def say_was(search_name):
         
         if last_string != "":
             TTS.say(last_string)
+            # TTS.runAndWait() # pyttsx3: Воспроизвести очередь реплик и дождаться окончания речи
         else:
-            TTS.say(f"Я сегодня не видела {search_name}.")
+            TTS.say(f"Я сегодня не видел {search_name}.")
+            # TTS.runAndWait() # pyttsx3: Воспроизвести очередь реплик и дождаться окончания речи
 
 
 def say_find(name_ask):
@@ -61,16 +71,38 @@ def say_find(name_ask):
     последняя строка из файла событий:
     {name_lookfor}, вас искал {name_ask} в *время*
     """
-    search_file = open(SEARCH_FILENAME, r)
+    search_file = open(SEARCH_FILENAME, 'r', encoding='utf-8')
     all_lines = search_file.readlines()
     for line in all_lines:  # line = "Иван Иванов 15:10"
         name_searcher = line.split(" ", -1)[0]  # разбиваем по последнему пробелу, получаем имя искомого чел-ка
         time_search = line.split(" ", -1)[1]  # разбиваем по последнему пробелу, получаем время
         if name_ask in line:
             TTS.say(f"{name_ask}, Вас искал {name_searcher} в {time_search}.")
+            # TTS.runAndWait() # pyttsx3: Воспроизвести очередь реплик и дождаться окончания речи
 
 
-def listen_forever:
+def say_hello(name, qt_textbrowser):
+    log = f"{datetime.datetime.now().strftime('%H:%M')} Detected: {name}"
+    qt_textbrowser.append(log)
+    # записать в журнал посещений:
+    write_event(VISITORS_FILENAME,
+        f"{name} был сегодня в " +
+        datetime.datetime.now().strftime('%H часов %M минут')
+    )
+    current_hour = int(datetime.datetime.now().strftime('%H'))
+    if current_hour in range(0, 12):
+        TTS.say(f"Доброе утро, {name}!")
+        # TTS.runAndWait() # pyttsx3: Воспроизвести очередь реплик и дождаться окончания речи
+    elif current_hour in range(12, 17):
+        TTS.say(f"Добрый день, {name}!")
+        # TTS.runAndWait() # pyttsx3: Воспроизвести очередь реплик и дождаться окончания речи
+    elif current_hour in range(17, 24):
+        TTS.say(f"Добрый вечер, {name}!")
+        # TTS.runAndWait() # pyttsx3: Воспроизвести очередь реплик и дождаться окончания речи
+    say_find(name)
+
+
+def listen_forever():
     """
     recognize_bing(): Microsoft Bing Speech
     recognize_google(): Google Web Speech API
@@ -82,19 +114,40 @@ def listen_forever:
 
     Из семи только recognize_sphinx() работает в автономном режиме с движком CMU Sphinx. Остальные шесть требуют подключения к интернету.
     """
+    global RUNNING
+    pprint(sr.Microphone.list_microphone_names())
+    # mic = sr.Microphone(device_index = 10)  # индекс его имени в списке, возвращаемом функцией list_microphone_names()
     r = sr.Recognizer()
     mic = sr.Microphone()
+    print("*** МИКРОФОН ЗАПУСТИЛСЯ ***")
+    TTS.say("МИКРОФОН ЗАПУСТИЛСЯ")
+    # TTS.runAndWait() # pyttsx3: Воспроизвести очередь реплик и дождаться окончания речи
 
     with mic as source:
-        while True:
-            r.adjust_for_ambient_noise(source)  # распознает речь в шуме
+        while(True):
+            r.adjust_for_ambient_noise(source, duration=0.5)  # распознает речь в шуме
             audio = r.listen(source)  # записывает ввод от источника до тех пор, пока не будет обнаружена тишина
-            heard = r.recognize_google(audio)
-            if "Гитовна" in heard:
-                if "меня кто-то искал" in heard:
-                    say_find(...)  # передать сюда имя, полученное с распознанной фото
-                if "где" in heard:
-                    say_was(heard[4:])  # имя, полученное после слова "где"
+            # print(audio)
+            try:
+                heard = r.recognize_google(audio, language='ru-RU').lower()
+                print(heard)
+                with open(HEARD_FILE, 'a+', encoding='utf-8') as heard_file:
+                    heard_file.write(heard + '\n')
+                # TTS.say(heard)
+                if "привет" in heard:
+                    TTS.say("Да?")
+                    if "меня кто-то искал" in heard:
+                        say_find(...)  # передать сюда имя, полученное с распознанной фото
+                    if "где" in heard:
+                        name_search = heard[4:]  # имя, полученное после слова "где"
+                        say_was(name_search)
+                        global SEARCH_FILENAME
+                        write_event(SEARCH_FILENAME, "%s %s" % (name_search, datetime.datetime.now().strftime('%H:%M')))  # записываем в журнал событий (SEARCH_FILENAME)
+            except sr.UnknownValueError:
+                TTS.say("Я не понял, скажите ещё раз")
+                # TTS.runAndWait() # pyttsx3: Воспроизвести очередь реплик и дождаться окончания речи
+            except sr.RequestError as e:  
+                print("Sphinx error; {0}".format(e))
 
 
 def grab(cam, queue, width, height):
@@ -149,16 +202,6 @@ def draw_label(frame, name, top, right, bottom, left, color):
     cv2.putText(frame, name, (left + 2, bottom - 6), font, 0.5, (0, 0, 0), 1)
 
 
-def write_visitor(name):
-    global VISITORS_FILENAME
-    file_log = open(VISITORS_FILENAME, 'a+')
-    file_log.write(
-        f"{name} был сегодня в " +
-        datetime.datetime.now().strftime('%H часов %M минут') +
-        '\n')
-    file_log.close()
-
-
 
 class MyWindowClass(QtWidgets.QMainWindow, FORM_CLASS):
     def __init__(self, parent=None):
@@ -183,6 +226,7 @@ class MyWindowClass(QtWidgets.QMainWindow, FORM_CLASS):
         # ==============================
 
         CAPTURE_THREAD.start()
+        LISTENER.start()
         self.startButton.setEnabled(False)
         self.startButton.setText('Starting...')
 
@@ -196,7 +240,7 @@ class MyWindowClass(QtWidgets.QMainWindow, FORM_CLASS):
 
             start_time_get_encodings = time.time()
             known_face_encodings, known_face_names = get_encodings(ENCODINGS_PATH)
-            print(f'=======  Время получения начальных encodings: {time.time()-start_time_get_encodings} seconds. =======')
+            # print(f'=======  Время получения начальных encodings: {time.time()-start_time_get_encodings} seconds. =======')
 
             img_height, img_width, img_colors = img.shape
             scale_w = float(self.window_width) / float(img_width)
@@ -218,13 +262,13 @@ class MyWindowClass(QtWidgets.QMainWindow, FORM_CLASS):
             start_time = time.time()
             # Find all the faces and face enqcodings in the frame of video
             face_locations = face_recognition.face_locations(img)
-            print(f'======= Время поиска лица на изображении: {time.time()-start_time} seconds. =======')
+            # print(f'======= Время поиска лица на изображении: {time.time()-start_time} seconds. =======')
 
             start_time = time.time()
             face_encodings = face_recognition.face_encodings(img, face_locations)
             # face_locations = face_recognition.face_locations(rgb_small_frame)
             # face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
-            print(f'======= Время составления encoding для лица: {time.time()-start_time} seconds. =======')
+            # print(f'======= Время составления encoding для лица: {time.time()-start_time} seconds. =======')
 
             # Loop through each face in this frame of video
             for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
@@ -239,59 +283,75 @@ class MyWindowClass(QtWidgets.QMainWindow, FORM_CLASS):
 
                 start_time = time.time()
                 matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
-                print(f'======= Время compare_faces: {time.time()-start_time} seconds. =======')
+                # print(f'======= Время compare_faces: {time.time()-start_time} seconds. =======')
                 name = 'Unknown'
 
                 # # If a match was found in known_face_encodings, just use the first one.
                 if True in matches:
                     first_match_index = matches.index(True)
-                    name = known_face_names[first_match_index]
+                    name = known_face_names[first_match_index][:-1]
                     print('DETECTED ', name)
                     log = ''
                     if "Unknown" in name:
                         log = f"{datetime.datetime.now().strftime('%H:%M')} UNKNOWN: {name}"                    
                         QT_textBrowser.append(log)
-                        write_visitor(name) # записать в журнал посещений
-                        # TODO: спросить имя, записать, узнать, что хотел, записать в журнал событий
-                    else:
-                        log = f"{datetime.datetime.now().strftime('%H:%M')} Detected: {name}"
-                        QT_textBrowser.append(log)
-                        write_visitor(name) # записать в журнал посещений
-                        current_hour = int(datetime.datetime.now().strftime('%H'))
-                        if current_hour >= 0 and current_hour < 12:
-                            TTS.say(f"Доброе утро, {name}!")
-                        elif current_hour >=12 and current_hour < 17:
-                            TTS.say(f"Добрый день, {name}!")
-                        elif current_hour >=17 and current_hour < 0:
-                            TTS.say(f"Добрый вечер, {name}!")
-                        # TODO: проверить, не искал ли его кто-то; если да - сказать
-                        say_find(name)
+                        # записать в журнал посещений:
+                        global VISITORS_FILENAME
+                        write_event(VISITORS_FILENAME,
+                            f"{name} был сегодня в " +
+                            datetime.datetime.now().strftime('%H часов %M минут')
+                        )
+                        # TTS.say("Как я могу к вам обращаться?")
+                        ### TODO: спросить имя
+                    else:  # если человек известен
+                        current_time = datetime.datetime.now().strftime('%H часов %M минут')
+                        try:                            
+                            visitors_file = open(VISITORS_FILENAME, 'r', encoding='utf-8')
+                            all_lines = visitors_file.readlines()
+                            visitors_file.close()
+                            last_string = all_lines[-1]
+                            if (name not in last_string) or (current_time not in last_string):
+                                say_hello(name, QT_textBrowser)
+                        except IndexError:
+                            say_hello(name, QT_textBrowser)
                     # создаем лог-файл для текущей сессии
                     global LOG_FILENAME
-                    file_log = open(LOG_FILENAME, 'a+')
-                    file_log.write(log+'\n')
-                    file_log.close()
+                    write_event(LOG_FILENAME, log)
                     draw_label(img, name, top, right, bottom, left, (0, 255, 0))
-                    cv2.imwrite('detected/' + name + 'png', img)
+                    cv2.imwrite('detected/' + name + '.png', img)
                 else:
                     num_files = len([f for f in os.listdir('unknown/') if os.path.isfile(os.path.join('unknown/', f))])
                     cv2.imwrite('unknown/Unknown_' + str(num_files) + '.png', img)
                     if save_encodings_by_photos('unknown/', ENCODINGS_PATH) != -1:
                         print('DETECTED UNKNOWN PERSON ', 'Unknown_' + str(num_files))
             self.ImgWidget.setImage(image)
-            print(f'======= Время обработки кадра: {time.time()-start_time_update} seconds. =======')
+            # print(f'======= Время обработки кадра: {time.time()-start_time_update} seconds. =======')
 
     def closeEvent(self, event):
         global RUNNING
         RUNNING = False
 
 
-CAPTURE_THREAD = threading.Thread(target=grab, args=(0, QUEUE, 200, 200))
-
 # TTS = pyttsx3.init()
+# TTS.setProperty('voice', 'ru')  # Наш голос по умолчанию
+# TTS.setProperty('rate', 150)    # Скорость в % (может быть > 100)
+# TTS.setProperty('volume', 0.8)  # Громкость (значение от 0 до 1)
+# print("pyttsx3 Voice names:")
+# for voice in TTS.getProperty('voices'):
+#     print(voice.name)
+#     if voice.name == 'russian':
+#         TTS.setProperty('voice', voice.id)
+
 TTS = ESpeakNG()
-TTS.speed(150)
+TTS.speed = 150
 TTS.voice = 'russian'
+# pprint(TTS.voices)
+# TTS.gender = 1
+
+LISTENER = threading.Thread(target=listen_forever)
+LISTENER.start()
+
+CAPTURE_THREAD = threading.Thread(target=grab, args=(0, QUEUE, 200, 200))
 
 APPLICATION = QtWidgets.QApplication(sys.argv)
 WINDOW = MyWindowClass(None)
